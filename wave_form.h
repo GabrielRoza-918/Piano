@@ -1,21 +1,36 @@
-/*
- *    @brief wave_form.h
- *
- *    Created on: jul 8th 2023
-  *
- *    @author: Gabriel Roza
- *
- */
+/**
+*    @brief wave_form.h
+*
+*    Created on: jul 8th 2023
+*
+*    @author: Gabriel Roza
+*
+**/
 
 #ifndef _WAVE_FORM_H_
 #define _WAVE_FORM_H_
 
 /* INCLUDES */
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 
+/* DEFINES */
+#define WAVE_SIZE 100
+#define WAVE_TYPE 5
+
+/* ENUM */
+typedef enum
+{
+	SINE		=0, 
+	SQUARE		=1, 
+	TRIANGLE	=2, 
+	SAW		=3, 
+	FLUTE		=4
+}wave_form_t;
+
 /* WAVE FORM TABLE */
-uint8_t wave[NUM_WAVES][SIZE] =
+uint8_t wave[WAVE_TYPE][WAVE_SIZE] =
 {
   //  SINE WAVE FORM
 	{50, 53, 56, 59, 62, 65, 68, 71, 74, 76, 79, 81, 84, 86, 88, 90, 92, 93, 95, 96, 97, 98, 99, 99, 99, 100, 
