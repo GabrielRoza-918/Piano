@@ -25,7 +25,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "math.h"
-#include <stdio.h>
+#include "wave_form.h"
 
 /* USER CODE END Includes */
 
@@ -36,8 +36,6 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define SIZE 100
-#define NUM_WAVES 5
 #define CLK_INTERNO 84000000
 #define PSC_TIM10 84
 #define SERIAL_TIMEOUT 1000
@@ -53,8 +51,6 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-
-enum WAVEFORMS{SINE=0, SQUARE=1, TRIANGLE=2, SAW=3, FLUTE=4};
 
 int newARR;
 
