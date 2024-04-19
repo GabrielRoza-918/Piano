@@ -24,7 +24,6 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "math.h"
 #include "wave_form.h"
 
 /* USER CODE END Includes */
@@ -36,10 +35,15 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define CLK_INTERNO 84000000
-#define PSC_TIM10 84
 #define SERIAL_TIMEOUT 1000
 #define MSG_SIZE 200
+
+#define BUTTONS_NUMBER 7
+
+#define ARM_CLK 84000000
+#defin PSC_TIM10 84
+
+#define ARR_CALCULE(freqNote) ( (ARM_CLK / PSC_TIM10 / freqNote / WAVE_SIZE) - 1 )
 
 /* USER CODE END PD */
 
@@ -52,20 +56,41 @@
 
 /* USER CODE BEGIN PV */
 
-int newARR;
+/* BUTTON CONTROL */
 
-int buttonStates[7];
-const int notas[7] = {264, 296, 332, 352, 396, 444, 498};
+static const uint8_t buttonsAlias[BUTTONS_NUMBER] =
+{
+	bt0_Pin, //	PB0
+	bt1_Pin, //	PB1
+	bt2_Pin, //	PB2
+	bt3_Pin, //	PB3
+	bt4_Pin, //	PB4
+	bt5_Pin, //	PB5
+	bt6_Pin  //	PB6
+};
 
-int waveOption, lastWave, optionInput;
-char msg[MSG_SIZE];
+static uint16_t buttonsStates[BUTTONS_NUMBER] = {[0 ... 6] = 0};
 
-int waveCounter;
-int16_t count;
-int16_t position;
+static uint8_t buttonsCounter_0 = 0;
+static uint8_t buttonsCounter_1 = 0;
 
-uint8_t i, j;
-uint8_t desligar;
+static int newARR;
+
+static const uint16_t notes[7] = {264, 296, 332, 352, 396, 444, 498};
+
+static wave_form_t waveOption;
+static wave_form_t lastWave;
+static wave_form_t optionInput;
+
+static char msg[MSG_SIZE];
+
+static uint8_t waveCounter;
+static int16_t count;
+static int16_t position;
+
+static uint8_t turnOff;
+
+static uint8_t waveSizeCounter = 0;
 
 /* USER CODE END PV */
 
@@ -78,17 +103,17 @@ void SystemClock_Config(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
+/* STR COMPARE FUNCTIONC */
+typedef enum
 {
-	waveCounter = __HAL_TIM_GET_COUNTER(&htim2);
-}
+    ALL_ZEROS 		= 1,
+    NO_ALL_ZEROS 	= 0
+} status_all_zeros_t;
 
-int CalculaARR_TIM10 (int freq_nota)
-{
-	int ARR_TIM10 = CLK_INTERNO / PSC_TIM10 / freq_nota / SIZE;
+static status_all_zeros_t allZeros(uint8_t *input_str, uint8_t size);
 
-	return ARR_TIM10 - 1;
-}
+static inline uint8_t strSize(uint8_t *input_str, uint8_t element_size) __attribute__(always_inline);
+
 /* USER CODE END 0 */
 
 /**
@@ -128,75 +153,69 @@ int main(void)
   HAL_TIM_Base_Start_IT(&htim10);
   HAL_UART_Receive_IT(&huart2, &optionInput, 1);
 
-  HAL_TIM_Encoder_Start_IT(&htim2, TIM_CHANNEL_ALL);
-  /* Infinite loop */
-  /* USER CODE END 2 */
-
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  waveCounter = waveCounter;
-
-      buttonStates[0] = HAL_GPIO_ReadPin(bt0_GPIO_Port, bt0_Pin) == GPIO_PIN_SET;
-      buttonStates[1] = HAL_GPIO_ReadPin(bt1_GPIO_Port, bt1_Pin) == GPIO_PIN_SET;
-      buttonStates[2] = HAL_GPIO_ReadPin(bt2_GPIO_Port, bt2_Pin) == GPIO_PIN_SET;
-      buttonStates[3] = HAL_GPIO_ReadPin(bt3_GPIO_Port, bt3_Pin) == GPIO_PIN_SET;
-      buttonStates[4] = HAL_GPIO_ReadPin(bt4_GPIO_Port, bt4_Pin) == GPIO_PIN_SET;
-      buttonStates[5] = HAL_GPIO_ReadPin(bt5_GPIO_Port, bt5_Pin) == GPIO_PIN_SET;
-      buttonStates[6] = HAL_GPIO_ReadPin(bt6_GPIO_Port, bt6_Pin) == GPIO_PIN_SET;
-      /*
-      buttonStates[7] = HAL_GPIO_ReadPin(bt7_GPIO_Port, bt7_Pin) == GPIO_PIN_SET;
-      buttonStates[8] = HAL_GPIO_ReadPin(bt8_GPIO_Port, bt8_Pin) == GPIO_PIN_SET;
-      buttonStates[9] = HAL_GPIO_ReadPin(bt9_GPIO_Port, bt9_Pin) == GPIO_PIN_SET;
-      buttonStates[10] = HAL_GPIO_ReadPin(bt10_GPIO_Port, bt10_Pin) == GPIO_PIN_SET;
-      buttonStates[11] = HAL_GPIO_ReadPin(bt11_GPIO_Port, bt11_Pin) == GPIO_PIN_SET;
-      */
-
-      for (j = 0; j <= 6; j++)
+      waveCounter = waveCounter;
+	  
+      for(buttonsCounter_0 = 0; buttonsCounter_0 <= (BUTTONS_NUMBER - 1);  buttonsCounter_0++)
       {
-          if (buttonStates[j])
+          buttonsStates[buttonsCounter_0] = HAL_GPIO_ReadPin(B_GPIO_Port, buttonsAlias[buttonsCounter_0]) == GPIO_PIN_SET;
+      }
+
+      for (buttonsCounter_1 = 0; buttonsCounter_1 <= (BUTTONS_NUMBER - 1); buttonsCounter_1++)
+      {
+          if (buttonsStates[buttonsCounter_1])
           {
-              // #CALCULA E SETA ARR
-        	  newARR = CalculaARR_TIM10(notas[j]);
+        	  newARR = ARR_CALCULE( notes[buttonsCounter_1] );
         	  __HAL_TIM_SET_AUTORELOAD(&htim10, newARR);
 
-        	  // #HABILITA TIMERS
         	  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
         	  HAL_TIM_Base_Start_IT(&htim10);
-
-          } else if((buttonStates[0]||buttonStates[1]||buttonStates[2]||buttonStates[3]||buttonStates[4]||buttonStates[5]||buttonStates[6])!=1)
+          }
+	  else if( allZeros(buttonsStates, strSize(buttonsStates, sizeof(buttonsStates)) ) == 1)
           {
         	  HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_1);
         	  HAL_TIM_Base_Stop_IT(&htim10);
           }
       }
 
-      waveOption = waveCounter/5;
+      waveOption = (wave_form_t)( waveCounter/5 );
+
       switch(waveOption)
       {
       	  case SINE:
       		  sprintf(msg, "\n\rSINE");
       		  break;
+	      
       	  case SQUARE:
       		  sprintf(msg, "\n\rSQUARE");
       		  break;
+	      
       	  case TRIANGLE:
       		  sprintf(msg, "\n\rTRIANGLE");
       		  break;
+	      
       	  case SAW:
       		  sprintf(msg, "\n\rSAW");
       		  break;
+	      
       	  case FLUTE:
       		  sprintf(msg, "\n\rFLUTE");
       		  break;
+	      
+	 default:
+	       	  sprintf(msg, "\n\rINVALID");
+      		  break;
       }
 
-      if(waveOption!=lastWave)
+      if(waveOption != lastWave)
       {
     	  HAL_UART_Transmit(&huart2, msg, strlen(msg), SERIAL_TIMEOUT);
     	  msg[0] = '\0';
-    	  lastWave=waveOption;
+	      
+    	  lastWave = waveOption;
       }
     /* USER CODE END WHILE */
 
@@ -254,23 +273,48 @@ void SystemClock_Config(void)
 /* USER CODE BEGIN 4 */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-	if(htim->Instance==TIM10)
+	if(htim->Instance == TIM10)
 	{
-		if(htim->Channel==TIM_CHANNEL_1)
+		if(htim->Channel == TIM_CHANNEL_1)
 		{
-			__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, wave[waveOption][i]);
-			i++;
-			if(i>=SIZE)
-			{
-				i=0;
-			}
+			__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, wave[waveOption][waveSizeCounter]);
+			
+			waveSizeCounter = (waveSizeCounter >= WAVE_SIZE) ? 0 : ++waveSizeCounter;
 		}
+	}
+	else
+	{
+		__NOP();
 	}
 }
 
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
 {
+	UNUSED(htim);
+	
+	waveCounter = __HAL_TIM_GET_COUNTER(&htim2);
+}
 
+static status_all_zeros_t allZeros(uint8_t *input_str, uint8_t size)
+{
+    uint8_t counter = 0;
+    status_all_zeros_t ret = ALL_ZEROS;
+	
+    for (counter = 0; counter < size; counter++) 
+    {
+        if (input_str[counter] != 0) 
+	{
+            ret = NO_ALL_ZEROS;
+		
+            break;
+        }
+    }
+    return ret;
+}
+
+static inline uint8_t strSize(uint8_t *input_str, uint8_t element_size)
+{
+    return (element_size / sizeof(input_str[0]));
 }
 /* USER CODE END 4 */
 
